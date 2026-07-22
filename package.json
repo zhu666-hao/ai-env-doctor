@@ -1,0 +1,45 @@
+{
+  "name": "ai-env-doctor",
+  "version": "0.1.1",
+  "description": "AI Agent 环境诊断工具 —— 一条命令诊断你的 AI Agent 环境哪里有问题",
+  "main": "dist/index.js",
+  "bin": {
+    "ai-env-doctor": "./bin/agent-doctor.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc && node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "claude-code",
+    "cursor",
+    "ai-agent",
+    "environment",
+    "doctor",
+    "diagnostic"
+  ],
+  "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ]
+}
