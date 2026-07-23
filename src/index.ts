@@ -1,19 +1,94 @@
 #!/usr/bin/env node
 /**
- * agent-doctor —— AI Agent 环境诊断工具
+ * ai-env-doctor —— AI Agent 环境诊断 + MCP 快照监控
  *
  * 用法:
- *   npx ai-env-doctor              扫描全部
- *   npx ai-env-doctor --fix        扫描并自动修复
- *   npx ai-env-doctor --json       输出 JSON 格式
+ *   npx ai-env-doctor              环境诊断（砖 1）
+ *   npx ai-env-doctor --fix        自动修复
+ *   npx ai-env-doctor --json       JSON 输出
+ *
+ *   npx ai-env-doctor snapshot save      保存 MCP 快照（砖 2）
+ *   npx ai-env-doctor snapshot diff      对比变化
+ *   npx ai-env-doctor snapshot status    快速检查
+ *   npx ai-env-doctor snapshot clean     清理旧快照
  */
 
 import chalk from "chalk";
 import { runAllChecks, runAutoFix, autoFixable, CheckResult } from "./env-check.js";
+import {
+  saveSnapshot,
+  loadLatestSnapshot,
+  getSnapshotAge,
+  getLatestSnapshotPath,
+  diffSnapshot,
+  checkStatus,
+  cleanSnapshots,
+  formatDiffOutput,
+  formatStatusOutput,
+} from "./snapshot.js";
 
 const args = process.argv.slice(2);
-const shouldFix = args.includes("--fix") || args.includes("-f");
+const subcommand = args[0];
+const subArgs = args.slice(1);
 const jsonOutput = args.includes("--json") || args.includes("-j");
+
+// ─── 子命令：snapshot ───────────────────────────────────────────────
+
+if (subcommand === "snapshot") {
+  const action = subArgs[0];
+
+  if (action === "save") {
+    const path = saveSnapshot();
+    console.log("");
+    console.log(chalk.green(`  ✅ 快照已保存: ${path}`));
+    console.log("");
+    process.exit(0);
+  }
+
+  if (action === "diff") {
+    const snapshot = loadLatestSnapshot();
+    if (!snapshot) {
+      console.log("");
+      console.log(chalk.yellow("  ⚠️  未找到快照。运行 `ai-env-doctor snapshot save` 创建第一个快照。"));
+      console.log("");
+      process.exit(0);
+    }
+    const diff = diffSnapshot(snapshot);
+    const age = getSnapshotAge();
+    formatDiffOutput(diff, age);
+    process.exit(0);
+  }
+
+  if (action === "status") {
+    const status = checkStatus();
+    formatStatusOutput(status, jsonOutput);
+    process.exit(status.changed ? 1 : 0);
+  }
+
+  if (action === "clean") {
+    const removed = cleanSnapshots();
+    console.log("");
+    console.log(chalk.green(`  ✅ 已清理 ${removed} 个旧快照。`));
+    console.log("");
+    process.exit(0);
+  }
+
+  // snapshot help
+  console.log("");
+  console.log(chalk.bold("  ai-env-doctor snapshot"));
+  console.log(chalk.gray("  MCP Server 快照监控 —— 记录环境状态，检测变化"));
+  console.log("");
+  console.log(`  ${chalk.white("snapshot save")}      保存当前 MCP 环境快照`);
+  console.log(`  ${chalk.white("snapshot diff")}      对比当前状态与上次快照`);
+  console.log(`  ${chalk.white("snapshot status")}    快速检查有无变化（退出码 1 = 有变化）`);
+  console.log(`  ${chalk.white("snapshot clean")}     清理旧快照（保留最近 10 个）`);
+  console.log("");
+  process.exit(0);
+}
+
+// ─── 默认：环境诊断（砖 1）─────────────────────────────────────────
+
+const shouldFix = args.includes("--fix") || args.includes("-f");
 
 // --- JSON Output ---
 
@@ -26,6 +101,7 @@ if (jsonOutput) {
   console.log(
     JSON.stringify(
       {
+        version: "0.2.0",
         timestamp: new Date().toISOString(),
         platform: process.platform,
         arch: process.arch,
@@ -55,8 +131,8 @@ if (jsonOutput) {
 // --- Terminal Output ---
 
 console.log("");
-console.log(chalk.bold("  Agent Doctor  v0.1.0"));
-console.log(chalk.gray("  AI Agent 环境诊断"));
+console.log(chalk.bold("  Agent Doctor  v0.2.0"));
+console.log(chalk.gray("  AI Agent 环境诊断 + MCP 快照监控"));
 console.log("");
 
 const results = runAllChecks();
@@ -118,6 +194,16 @@ if (shouldFix && fixable.length > 0) {
 } else if (fixable.length > 0 && !shouldFix) {
   console.log("");
   console.log(chalk.gray(`  运行 ${chalk.white("npx ai-env-doctor --fix")} 自动修复 ${fixable.length} 项`));
+}
+
+// 提醒快照功能
+const snapshotAge = getSnapshotAge();
+if (snapshotAge === null) {
+  console.log("");
+  console.log(chalk.gray(`  新功能: ${chalk.white("npx ai-env-doctor snapshot save")} —— 保存 MCP 环境快照，监控变化`));
+} else {
+  console.log("");
+  console.log(chalk.gray(`  上次 MCP 快照: ${snapshotAge} 天前  |  ${chalk.white("npx ai-env-doctor snapshot diff")} 查看变化`));
 }
 
 console.log("");

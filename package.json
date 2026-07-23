@@ -1,6 +1,6 @@
 {
   "name": "ai-env-doctor",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "AI Agent 环境诊断工具 —— 一条命令诊断你的 AI Agent 环境哪里有问题",
   "main": "dist/index.js",
   "bin": {
