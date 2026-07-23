@@ -222,21 +222,49 @@ function checkGitBash(): CheckResult {
       status: "ok",
     };
   }
-  // 检查 Git Bash 是否存在
-  const gitBashPaths = [
-    "C:\\Program Files\\Git\\bin\\bash.exe",
-    "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
-    `${getEnvVar("USERPROFILE")}\\scoop\\apps\\git\\current\\bin\\bash.exe`,
-  ];
 
+  // 1) 尝试从 PATH 中定位 bash.exe
   let foundPath = "";
-  for (const p of gitBashPaths) {
+  try {
+    const stdout = execSync("where bash", {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "ignore"],
+      timeout: 5000,
+    });
+    const lines = stdout.trim().split("\r\n");
+    // 优先选路径含 Git 的（而非 WSL/system32 里的 bash）
+    const gitLine = lines.find((l: string) => l.includes("Git"));
+    foundPath = gitLine || lines[0] || "";
+  } catch {
+    // where 失败，说明 PATH 里没有 bash
+  }
+
+  // 2) 如果 PATH 里没有，通过 git --exec-path 反查
+  if (!foundPath) {
     try {
-      execSync(`"${p}" --version`, { encoding: "utf-8", stdio: "ignore", timeout: 3000 });
-      foundPath = p;
-      break;
+      const gitExec = execSync("git --exec-path", {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "ignore"],
+        timeout: 5000,
+      }).trim();
+      // git --exec-path 指向 .../Git/mingw64/libexec/git-core
+      // bash 在  .../Git/bin/bash.exe
+      const candidate = gitExec.replace(
+        /mingw64[\\/]libexec[\\/]git-core$/,
+        "bin\\bash.exe"
+      );
+      try {
+        execSync(`"${candidate}" --version`, {
+          encoding: "utf-8",
+          stdio: "ignore",
+          timeout: 3000,
+        });
+        foundPath = candidate;
+      } catch {
+        // 路径不对，算了
+      }
     } catch {
-      continue;
+      // git 可能也没装
     }
   }
 
@@ -246,7 +274,7 @@ function checkGitBash(): CheckResult {
       expected: "已安装",
       actual: "未找到",
       status: "warn",
-      fix: "Claude Code 的某些功能（observer、守护进程）依赖 Git Bash。安装: https://git-scm.com/download/win",
+      fix: "Claude Code 的某些功能依赖 Git Bash。安装: https://git-scm.com/download/win",
       autoFix: false,
     };
   }
@@ -258,7 +286,7 @@ function checkGitBash(): CheckResult {
       expected: "路径不含空格",
       actual: `含空格: ${foundPath}`,
       status: "warn",
-      fix: "Git Bash 路径含空格可能导致 observer 守护进程失败（#2502, #2461）。建议重新安装 Git 到不含空格的路径，如 C:\\Git\\",
+      fix: "Git Bash 路径含空格可能导致 observer 守护进程失败（#2502, #2461）。重装 Git 到 C:\\Git\\ 即可。",
       autoFix: false,
     };
   }
